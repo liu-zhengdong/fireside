@@ -5,21 +5,19 @@ import {
   ArrowRight,
   ArrowUp,
   BookOpen,
-  Calendar,
   CalendarDays,
-  CalendarRange,
   CalendarX2,
   Check,
   ChevronLeft,
   ChevronRight,
   Clock3,
   Download,
+  Ellipsis,
   Flame,
   GripVertical,
   ImageDown,
   Lightbulb,
   Link as LinkIcon,
-  List,
   LockKeyhole,
   MapPin,
   Menu,
@@ -68,7 +66,7 @@ const tabs: { key: Tab; label: string }[] = [
 ];
 
 const statusMeta: Record<TopicStatus, { label: string; className: string }> = {
-  OPEN: { label: '等待添柴', className: 'open' },
+  OPEN: { label: '等待认领', className: 'open' },
   CLAIMED: { label: '已被认领', className: 'claimed' },
   SCHEDULED: { label: '已排期', className: 'scheduled' },
   ARCHIVED: { label: '已经归档', className: 'archived' },
@@ -226,20 +224,20 @@ function useDialogA11y(onClose: () => void, label = 'dialog') {
 function FireVisual() {
   return (
     <div className="fire-card" aria-label="围炉夜话的篝火插画">
-      <div className="fire-topline"><span>FIRE IS ON</span><b>OPEN TOPICS</b></div>
+      <div className="fire-topline"><span>FIRESIDE</span><b>WEEKLY SHARING</b></div>
       <div className="orbit orbit-a" />
       <div className="orbit orbit-b" />
-      <span className="float-chip chip-a">Curiosity</span>
-      <span className="float-chip chip-b">Connect the dots</span>
+      <span className="float-chip chip-a">AI</span>
+      <span className="float-chip chip-b">产品</span>
       <span className="float-chip chip-c">Demo</span>
-      <span className="float-chip chip-d">Unknown</span>
+      <span className="float-chip chip-d">实践</span>
       <div className="sparks">{Array.from({ length: 9 }).map((_, i) => <i key={i} />)}</div>
       <div className="campfire">
         <div className="flame flame-back" />
         <div className="flame flame-main"><div className="flame-core" /></div>
         <div className="log log-a" /><div className="log log-b" />
       </div>
-      <div className="fire-caption"><Flame size={15} /><span>好奇是火种，分享让微光成为火焰</span></div>
+      <div className="fire-caption"><Flame size={15} /><span>每周一次，分享最近在研究的问题</span></div>
     </div>
   );
 }
@@ -263,6 +261,7 @@ function TopicCard({ topic, onAction, onParticipants, onPoster, onMeeting, canCo
   const phase = topicPhase(topic, now);
   const meta = topicDisplayMeta(topic, now);
   const hasMeetingUrl = topic.hasMeetingUrl || Boolean(topicMeetingUrl(topic));
+  const hasMaintenanceMenu = canCollaborate || (topic.status === 'SCHEDULED' && phase === 'UPCOMING');
   return (
     <article
       className={`topic-card topic-${meta.className} ${draggable ? 'is-draggable' : ''}`}
@@ -272,71 +271,69 @@ function TopicCard({ topic, onAction, onParticipants, onPoster, onMeeting, canCo
       onDragOver={(event) => draggable && !reordering && event.preventDefault()}
       onDrop={(event) => { event.preventDefault(); onDrop(topic.id); }}
     >
-      <div className="topic-head">
+      <div className="topic-status-column">
         <span className={`status-pill ${meta.className}`}><i />{meta.label}</span>
-        <div className="topic-head-actions">
-          {draggable && <>
+        <span className="topic-number">#{String(topic.id).padStart(3, '0')}</span>
+        {draggable && <div className="topic-order-controls">
             <button className="drag-handle" disabled={reordering} draggable={!reordering} onDragStart={(event) => { event.stopPropagation(); onDragStart(topic.id); }} title="拖动排序" aria-label={`拖动 ${topic.title} 排序`}><GripVertical size={14} /></button>
             <button disabled={reordering || index === 0} onClick={() => onMove(topic.id, -1)} title="上移" aria-label={`将 ${topic.title} 上移`}><ArrowUp size={13} /></button>
             <button disabled={reordering || index === total - 1} onClick={() => onMove(topic.id, 1)} title="下移" aria-label={`将 ${topic.title} 下移`}><ArrowDown size={13} /></button>
-          </>}
-          <span className="topic-number">#{String(topic.id).padStart(3, '0')}</span>
-        </div>
+        </div>}
       </div>
-      <div className="topic-tags">
-        {topic.tags.map((tag) => <span key={tag}>{tag}</span>)}
-      </div>
-      <h3>{topic.title}</h3>
-      <p className="topic-summary">{topic.summary}</p>
 
-      {topic.status === 'SCHEDULED' && topic.scheduledAt && (
-        <div className="schedule-box">
-          <div><CalendarDays size={16} /><strong>{formatDate(topic.scheduledAt)}</strong></div>
-          <div><MapPin size={15} /><span>{legacyMeetingUrl(topic.room) ? '线上会议' : topic.room}</span><Clock3 size={15} /><span>{topic.duration} 分钟</span></div>
-          {hasMeetingUrl && canAttendPhase(phase) && <button className="meeting-link" onClick={() => onMeeting(topic)}><LinkIcon size={14} />加入会议</button>}
-          {phase === 'LIVE' && <p className="schedule-phase live">分享正在进行，仍可报名或加入会议。</p>}
-          {phase === 'ENDED' && <p className="schedule-phase ended">分享已结束，等待归档。</p>}
-          {!phase && <p className="schedule-phase ended">排期信息不完整，请编辑议题进行修正。</p>}
+      <div className="topic-content">
+        <div className="topic-tags">
+          {topic.tags.map((tag) => <span key={tag}>{tag}</span>)}
         </div>
-      )}
-
-      {topic.status === 'ARCHIVED' && topic.takeaway && (
-        <div className="takeaway"><Lightbulb size={16} /><p><b>炉边余温</b>{topic.takeaway}</p></div>
-      )}
-
-      <div className="topic-footer">
+        <h3>{topic.title}</h3>
+        <p className="topic-summary">{topic.summary}</p>
         <div className="people">
           <span><UserRound size={14} /> 发起 · {topic.proposer}</span>
           {topic.presenter && <span><Flame size={14} /> 分享 · {topic.presenter}</span>}
           {(topic.status === 'SCHEDULED' || topic.status === 'ARCHIVED') && <span><Users size={14} /> {topic.participantCount} 人报名</span>}
         </div>
+        {topic.status === 'ARCHIVED' && topic.takeaway && (
+          <div className="takeaway"><Lightbulb size={16} /><p><b>分享记录</b>{topic.takeaway}</p></div>
+        )}
+      </div>
+
+      <div className="topic-side">
+        {topic.status === 'SCHEDULED' && topic.scheduledAt ? <div className="schedule-box">
+          <div><CalendarDays size={16} /><strong>{formatDate(topic.scheduledAt)}</strong></div>
+          <div><MapPin size={15} /><span>{legacyMeetingUrl(topic.room) ? '线上会议' : topic.room}</span><Clock3 size={15} /><span>{topic.duration} 分钟</span></div>
+          {phase === 'LIVE' && <p className="schedule-phase live">分享正在进行</p>}
+          {phase === 'ENDED' && <p className="schedule-phase ended">分享已结束，等待归档</p>}
+          {!phase && <p className="schedule-phase ended">排期信息不完整</p>}
+        </div> : <p className="topic-side-label">{topic.status === 'ARCHIVED' ? '分享记录已归档' : '尚未安排时间'}</p>}
         <div className="card-action-group">
           {topic.status === 'OPEN' && <button className="card-action warm" onClick={() => onAction('claim', topic)}>认领议题 <ArrowRight size={15} /></button>}
-          {topic.status === 'CLAIMED' && <>
-            <button className="card-action subtle" onClick={() => onAction('release', topic)}>重新开放 <RotateCcw size={14} /></button>
-            <button className="card-action cyan" onClick={() => onAction('schedule', topic)}>安排分享 <CalendarDays size={15} /></button>
-          </>}
-          {topic.status === 'SCHEDULED' && <>
-            {phase === 'UPCOMING' && <button className="card-action subtle" onClick={() => onAction('unschedule', topic)}>取消排期 <CalendarX2 size={14} /></button>}
-            {canAttendPhase(phase) && <button className="card-action cyan" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>报名参加 <Users size={14} /></button>}
-            {phase === 'UPCOMING' && <button className="card-action warm" data-focus-return={`poster-${topic.id}`} onClick={() => onPoster(topic)}>生成海报 <ImageDown size={14} /></button>}
-            {phase === 'ENDED' && <>
-              <button className="card-action subtle" onClick={() => onAction('unschedule', topic)}>未举行 / 重新排期 <CalendarX2 size={14} /></button>
-              <button className="card-action cyan" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>查看参与 <Users size={14} /></button>
-              <button className="card-action" onClick={() => onAction('archive', topic)}>完成归档 <Archive size={15} /></button>
-            </>}
-          </>}
+          {topic.status === 'CLAIMED' && <button className="card-action cyan" onClick={() => onAction('schedule', topic)}>安排分享 <CalendarDays size={15} /></button>}
+          {topic.status === 'SCHEDULED' && phase === 'LIVE' && hasMeetingUrl
+            ? <button className="card-action cyan" onClick={() => onMeeting(topic)}>加入会议 <LinkIcon size={14} /></button>
+            : topic.status === 'SCHEDULED' && canAttendPhase(phase)
+              ? <button className="card-action cyan" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>报名参加 <Users size={14} /></button>
+              : null}
+          {topic.status === 'SCHEDULED' && phase === 'ENDED' && <button className="card-action warm" onClick={() => onAction('archive', topic)}>整理记录 <Archive size={15} /></button>}
           {topic.status === 'ARCHIVED' && <>
-            <button className="card-action subtle" onClick={() => onAction('unarchive', topic)}>撤销归档 <RotateCcw size={14} /></button>
-            <button className="card-action" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>查看参与 <Users size={14} /></button>
-            {topic.materialUrl && <a className="card-action" href={topic.materialUrl} target="_blank" rel="noreferrer">查看资料 <LinkIcon size={15} /></a>}
+            {topic.materialUrl ? <a className="card-action warm" href={topic.materialUrl} target="_blank" rel="noreferrer">查看资料 <LinkIcon size={15} /></a> : <button className="card-action" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>查看参与 <Users size={14} /></button>}
           </>}
         </div>
+        {topic.status === 'SCHEDULED' && phase === 'ENDED' && <button className="card-secondary-action" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>查看参与者</button>}
+        {topic.status === 'ARCHIVED' && topic.materialUrl && <button className="card-secondary-action" data-focus-return={`participants-${topic.id}`} onClick={() => onParticipants(topic)}>查看参与者</button>}
       </div>
-      {canCollaborate && <div className="card-maintenance" aria-label="议题维护">
-        <button onClick={() => onAction('edit', topic)} aria-label={`编辑 ${topic.title}`}><Pencil size={14} />编辑</button>
-        {canDeleteTopic(topic) && <button data-delete-topic-id={topic.id} className="danger" onClick={() => onAction('delete', topic)} aria-label={`删除 ${topic.title}`}><Trash2 size={14} />删除</button>}
-      </div>}
+
+      {hasMaintenanceMenu && <details className="card-menu">
+        <summary aria-label={`更多操作：${topic.title}`}><Ellipsis size={18} /></summary>
+        <div aria-label="议题维护">
+          {topic.status === 'SCHEDULED' && phase === 'UPCOMING' && <button data-focus-return={`poster-${topic.id}`} onClick={() => onPoster(topic)}><ImageDown size={14} />生成海报</button>}
+          {canCollaborate && topic.status === 'CLAIMED' && <button onClick={() => onAction('release', topic)}><RotateCcw size={14} />重新开放</button>}
+          {canCollaborate && topic.status === 'SCHEDULED' && phase === 'UPCOMING' && <button onClick={() => onAction('unschedule', topic)}><CalendarX2 size={14} />取消排期</button>}
+          {canCollaborate && topic.status === 'SCHEDULED' && phase === 'ENDED' && <button onClick={() => onAction('unschedule', topic)}><CalendarX2 size={14} />未举行 / 重新排期</button>}
+          {canCollaborate && topic.status === 'ARCHIVED' && <button onClick={() => onAction('unarchive', topic)}><RotateCcw size={14} />撤销归档</button>}
+          {canCollaborate && <button onClick={() => onAction('edit', topic)} aria-label={`编辑 ${topic.title}`}><Pencil size={14} />编辑议题</button>}
+          {canCollaborate && canDeleteTopic(topic) && <button data-delete-topic-id={topic.id} className="danger" onClick={() => onAction('delete', topic)} aria-label={`删除 ${topic.title}`}><Trash2 size={14} />删除议题</button>}
+        </div>
+      </details>}
     </article>
   );
 }
@@ -479,8 +476,8 @@ function CalendarView({ topics, mode, cursor, onCursorChange, onOpen, onParticip
             })}
           </div>
           {!hasEventsInRange && <div className="calendar-empty-action">
-            <strong>本周还没有围炉活动</strong>
-            <p>{nextTopic ? `下一场是「${nextTopic.title}」` : '可以先认领一簇火种，准备下一场分享。'}</p>
+            <strong>本周还没有安排分享</strong>
+            <p>{nextTopic ? `下一场是「${nextTopic.title}」` : '可以先认领一个议题，为下一场分享做准备。'}</p>
             <button onClick={() => nextTopic?.scheduledAt ? onCursorChange(new Date(nextTopic.scheduledAt)) : onShowOpenTopics()}>{nextTopic ? '查看下一场' : '查看待认领议题'}</button>
           </div>}
         </div>
@@ -556,8 +553,8 @@ function ParticipantsModal({ topic, onClose, onChanged, onConflict, unlockVersio
     <div ref={dialogRef} className="modal participants-modal" role="dialog" aria-modal="true" aria-labelledby="participants-title" tabIndex={-1} inert={!isTop}>
       <button className="modal-close" onClick={onClose} aria-label="关闭"><X size={19} /></button>
       <span className="modal-eyebrow"><Users size={14} /> FIRESIDE GUESTS</span>
-      <h2 id="participants-title">{canJoin ? '报名参加围炉' : '本期参与伙伴'}</h2>
-      <p className="modal-intro">可以来分享，也可以只守着火光坐一会儿。姓名是公开署名，当前不绑定个人账号。</p>
+      <h2 id="participants-title">{canJoin ? '报名参加' : '本期参与者'}</h2>
+      <p className="modal-intro">报名后可以参加分享和讨论。姓名会公开显示，当前不绑定个人账号。</p>
       <div className="selected-topic"><span>本次议题</span><strong>{topic.title}</strong></div>
       {canJoin && <form className="join-form" onSubmit={join}>
         <label>你的名字<input name="name" required maxLength={30} placeholder="怎么称呼你" autoFocus data-initial-focus /></label>
@@ -565,7 +562,7 @@ function ParticipantsModal({ topic, onClose, onChanged, onConflict, unlockVersio
       </form>}
       <div className="participant-list" aria-live="polite">
         <div className="participant-list-head"><b>参与名单</b><span>{participants.length} 人</span></div>
-        {loading ? <p>正在靠近炉火…</p> : participants.length === 0 ? <p>还没有人报名，成为第一位围炉伙伴吧。</p> : participants.map((participant) => <div className="participant-row" key={participant.id}>
+        {loading ? <p>正在加载报名信息…</p> : participants.length === 0 ? <p>还没有人报名，你可以第一个报名。</p> : participants.map((participant) => <div className="participant-row" key={participant.id}>
           <span><UserRound size={14} />{participant.name}</span>
           {canJoin && <button disabled={submitting} onClick={() => void leave(participant)} aria-label={`取消 ${participant.name} 的报名`}>取消报名</button>}
         </div>)}
@@ -698,7 +695,7 @@ function MobileNavigation({ active, onClose, onNavigate, accessReady, accessEnab
 
   return <div className="modal-backdrop mobile-nav-backdrop" onMouseDown={(event) => isTop && event.target === event.currentTarget && onClose()}>
     <div ref={dialogRef} className="mobile-nav-modal" role="dialog" aria-modal="true" aria-labelledby="mobile-nav-title" tabIndex={-1} inert={!isTop}>
-      <div className="mobile-nav-head"><div><span>FIRESIDE MENU</span><h2 id="mobile-nav-title">去哪里添柴？</h2></div><button className="mobile-nav-close" onClick={onClose} aria-label="关闭菜单"><X size={20} /></button></div>
+      <div className="mobile-nav-head"><div><span>FIRESIDE MENU</span><h2 id="mobile-nav-title">页面导航</h2></div><button className="mobile-nav-close" onClick={onClose} aria-label="关闭菜单"><X size={20} /></button></div>
       <nav aria-label="移动业务导航">
         {links.map((link, index) => <button key={link.key} data-initial-focus={index === 0 ? true : undefined} aria-current={active === link.key ? 'page' : undefined} onClick={() => onNavigate(link.key)}><span>{link.label}</span><ArrowRight size={17} /></button>)}
       </nav>
@@ -841,7 +838,7 @@ function PosterModal({ topic, onClose, onSync }: { topic: Topic; onClose: () => 
       <div className="poster-layout">
         <div className="poster-preview" aria-live="polite">
           <canvas ref={canvasRef} className="poster-canvas-source" aria-hidden="true" />
-          {busy && <div className="poster-status"><Flame className="loading-flame" /><span>{phase === 'checking' ? '正在确认最新议题与排期…' : '正在举起火炬…'}</span></div>}
+          {busy && <div className="poster-status"><Flame className="loading-flame" /><span>{phase === 'checking' ? '正在确认最新议题与排期…' : '正在生成海报…'}</span></div>}
           {phase === 'ready' && posterUrl && model && <img src={posterUrl} alt={`围炉夜话宣讲海报：${model.title}，${model.date} ${model.time}`} />}
           {!busy && phase !== 'ready' && error && <div ref={errorRef} className="poster-status error" role="alert" tabIndex={-1}><span>{error}</span>{retryable
             ? <button onClick={() => setAttempt((value) => value + 1)}>重新读取并生成</button>
@@ -1080,16 +1077,16 @@ function Modal({ kind, topic, onClose, onComplete, onConflict, onRequireAccess, 
   }
   const { dialogRef, isTop } = useDialogA11y(closeModal, kind);
   const copy = {
-    create: { eyebrow: 'ADD A SPARK', title: '发起一个新议题', intro: '不必是完整答案，一个真实的问题就足够成为火种。' },
-    claim: { eyebrow: 'PICK UP THE TORCH', title: '认领这个议题', intro: '认领不是承诺成为专家，只是愿意比昨晚多探索一点。' },
-    schedule: { eyebrow: 'SAVE THE DATE', title: '安排炉边分享', intro: '选一个大家方便靠近炉火的时间。' },
-    archive: { eyebrow: 'KEEP THE EMBERS', title: '沉淀本期收获', intro: '留下一点余温，让后来的人也能顺着线索继续探索。' },
-    release: { eyebrow: 'PASS THE TORCH', title: '重新开放认领？', intro: '分享人退出后，这个议题会重新等待伙伴接过火炬。' },
+    create: { eyebrow: 'CREATE TOPIC', title: '发起一个新议题', intro: '写下你想讨论的问题，以及希望从分享中了解什么。' },
+    claim: { eyebrow: 'CLAIM TOPIC', title: '认领这个议题', intro: '认领后，你可以先收集资料，再安排分享时间。' },
+    schedule: { eyebrow: 'SCHEDULE', title: '安排分享', intro: '选择分享时间、地点和预计时长。' },
+    archive: { eyebrow: 'ARCHIVE', title: '整理本期记录', intro: '记录主要结论、参考资料和后续问题。' },
+    release: { eyebrow: 'REOPEN TOPIC', title: '重新开放认领？', intro: '分享人退出后，其他人可以重新认领这个议题。' },
     unschedule: endedReset
       ? { eyebrow: 'RESET THE FIRE', title: '确认未举行 / 重新排期？', intro: '这次分享已过排期时间；确认未举行后，议题会回到准备中。' }
       : { eyebrow: 'CHANGE OF PLAN', title: '取消这次排期？', intro: '议题会回到准备中，可以稍后重新安排时间。' },
     unarchive: { eyebrow: 'RESTORE THE FIRE', title: '撤销这次归档？', intro: '议题会恢复为已排期，原排期保留，归档内容将被清空。' },
-    edit: { eyebrow: 'TEND THE FIRE', title: '编辑议题', intro: '更新议题信息，让每一位围炉伙伴看到准确的线索。' },
+    edit: { eyebrow: 'EDIT TOPIC', title: '编辑议题', intro: '更新议题信息，确保参与者看到准确的内容。' },
     delete: { eyebrow: 'REMOVE A SPARK', title: '删除这个议题？', intro: '永久删除只用于误建、测试或重复议题。' },
   }[kind];
 
@@ -1284,10 +1281,10 @@ function Modal({ kind, topic, onClose, onComplete, onConflict, onRequireAccess, 
           ...(selfPresent ? { presenter: proposer } : {}),
           tags: String(data.get('tags')).split(/[,，]/).map((tag) => tag.trim()).filter(Boolean),
         });
-        onComplete(selfPresent ? '议题已发布并由你分享，接下来可以安排时间' : '新火种已放到炉边，等待同伴认领');
+        onComplete(selfPresent ? '议题已发布并由你分享，接下来可以安排时间' : '议题已发布，正在等待认领');
       } else if (kind === 'claim' && topic) {
         await api.claim(topic.id, topic.revision, String(data.get('presenter')));
-        onComplete('认领成功，期待你把好奇变成一次分享');
+        onComplete('认领成功，接下来可以准备内容并安排分享时间');
       } else if (kind === 'schedule' && topic) {
         await api.schedule(topic.id, topic.revision, {
           scheduledAt: new Date(String(data.get('scheduledAt'))).toISOString(),
@@ -1295,13 +1292,13 @@ function Modal({ kind, topic, onClose, onComplete, onConflict, onRequireAccess, 
           room: String(data.get('room')),
           meetingUrl: String(data.get('meetingUrl')),
         });
-        onComplete('排期完成，炉边已经为这次分享留好位置');
+        onComplete('排期完成，这次分享已加入活动安排');
       } else if (kind === 'archive' && topic) {
         await api.archive(topic.id, topic.revision, {
           takeaway: String(data.get('takeaway')),
           materialUrl: String(data.get('materialUrl')),
         });
-        onComplete('议题已归档，这簇火光被好好保存了');
+        onComplete('议题已归档，分享记录已经保存');
       } else if (kind === 'release' && topic) {
         await api.release(topic.id, topic.revision);
         onComplete('议题已重新开放认领');
@@ -1382,17 +1379,17 @@ function Modal({ kind, topic, onClose, onComplete, onConflict, onRequireAccess, 
         </section>}
 
         <form key={kind === 'edit' ? editDraftVersion : undefined} ref={kind === 'edit' ? editFormRef : undefined} onSubmit={submit} hidden={Boolean(pendingEdit)} aria-hidden={pendingEdit ? 'true' : undefined}>
-          {kind === 'create' && !canCollaborate && <div className="phase-lock-note" role="status">可以先填写草稿；发布时再用围炉口令解锁，系统不会自动提交。</div>}
+          {kind === 'create' && !canCollaborate && <div className="phase-lock-note" role="status">可以先填写草稿；发布时再用团队口令解锁，系统不会自动提交。</div>}
           {kind === 'create' && <>
             <label>议题标题<input name="title" required maxLength={80} placeholder="最近有什么让你停下来多看了一眼？" autoFocus data-initial-focus /></label>
-            <label>一句话简介<textarea name="summary" required maxLength={500} rows={4} placeholder="它为什么值得一起聊聊？你想从哪里开始探索？" /></label>
+            <label>一句话简介<textarea name="summary" required maxLength={500} rows={4} placeholder="这个议题想讨论什么？你希望了解什么？" /></label>
             <div className="form-row">
               <label>你的名字<input name="proposer" required maxLength={30} placeholder="怎么称呼你" /></label>
               <label>标签（最多 5 个）<input name="tags" maxLength={100} placeholder="AI, 产品, Demo" /></label>
             </div>
             <fieldset className="intent-options">
               <legend>发布后由谁分享？</legend>
-              <label><input type="radio" name="publishIntent" value="open" defaultChecked /><span><b>征集分享人</b><small>先发布问题，邀请伙伴接过火炬</small></span></label>
+              <label><input type="radio" name="publishIntent" value="open" defaultChecked /><span><b>征集分享人</b><small>先发布问题，等待其他人认领</small></span></label>
               <label><input type="radio" name="publishIntent" value="self" /><span><b>我来分享</b><small>发布后直接进入准备中，不再重复认领</small></span></label>
             </fieldset>
           </>}
@@ -1468,6 +1465,7 @@ export default function App() {
   const [loadedSort, setLoadedSort] = useState<TopicSort | null>(null);
   const [orderVersion, setOrderVersion] = useState(0);
   const [reordering, setReordering] = useState(false);
+  const [orderMode, setOrderMode] = useState(false);
   const reorderInFlight = useRef(false);
   const topicRequestId = useRef(0);
   const statsRequestId = useRef(0);
@@ -1825,6 +1823,7 @@ export default function App() {
             ? 'topics'
             : null;
   function changeSort(nextSort: TopicSort) {
+    setOrderMode(false);
     activeSort.current = nextSort;
     topicRequestId.current += 1;
     setLoadedSort(null);
@@ -1832,6 +1831,9 @@ export default function App() {
     setSort(nextSort);
   }
   const canManualReorder = canCollaborate && view === 'list' && sort === 'manual' && loadedSort === 'manual' && !loading && tab === 'ALL' && !search.trim();
+  useEffect(() => {
+    if (!canManualReorder) setOrderMode(false);
+  }, [canManualReorder]);
 
   async function persistOrder(next: Topic[], previous: Topic[], moved: Topic) {
     if (reorderInFlight.current) return;
@@ -1890,6 +1892,14 @@ export default function App() {
   }
 
   const accessLabel = !accessReady ? '确认协作…' : canCollaborate && accessEnabled ? '退出协作' : canCollaborate ? '协作开放' : '解锁协作';
+  const nextTopic = stats.nextTopic;
+  const tabCounts: Record<Tab, number> = {
+    ALL: stats.open + stats.claimed + stats.scheduled + stats.archived,
+    OPEN: stats.open,
+    CLAIMED: stats.claimed,
+    SCHEDULED: stats.scheduled,
+    ARCHIVED: stats.archived,
+  };
 
   return <>
     <header className="site-header">
@@ -1914,54 +1924,66 @@ export default function App() {
     <main id="top">
       <section className="hero shell">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="pulse" />WEEKLY · AI FIRESIDE CHAT</div>
+          <div className="eyebrow"><span className="pulse" />每周 AI 主题分享与讨论</div>
           <h1>围炉<span>夜话</span></h1>
-          <p className="english">CURIOSITY IN. KNOWLEDGE OUT.</p>
-          <div className="hero-poem"><p>好奇，是火种。</p><p>关注，是柴薪。</p><strong>分享，让微光成为火焰。</strong></div>
-          <h2>每周一晚，<em>为彼此的好奇添一把柴。</em></h2>
-          <p className="hero-desc">把最近让你停下来多看一眼的东西，带到炉边来。可以自己举起火炬，也可以邀请同伴接力；这里不做培训，不做汇报。</p>
-          <div className="hero-actions">
-            <button className="primary-button" onClick={() => openAction('create')}><Plus size={18} /> 发起议题</button>
-            <button className="ghost-button" onClick={scrollToTopics}>看看大家在聊什么 <ArrowRight size={17} /></button>
+          <p className="hero-desc">每周选一个大家感兴趣的话题，由一位同事做分享，剩下的时间自由讨论。你可以报名参加，也可以发起或认领议题。</p>
+          <div className="hero-event">
+            <div className="hero-event-label"><CalendarDays size={15} /><span>下一场分享</span></div>
+            {nextTopic ? <>
+              <h2>{nextTopic.title}</h2>
+              <div className="hero-event-meta">
+                <span><CalendarDays size={15} />{nextTopic.scheduledAt && formatDate(nextTopic.scheduledAt)}</span>
+                <span><MapPin size={15} />{legacyMeetingUrl(nextTopic.room) ? '线上会议' : nextTopic.room}</span>
+                <span><Clock3 size={15} />{nextTopic.duration} 分钟</span>
+              </div>
+              <div className="hero-actions">
+                <button className="primary-button" onClick={() => openParticipants(nextTopic)}><Users size={17} /> 报名参加</button>
+                <button className="ghost-button" onClick={() => setActivityTopic(nextTopic)}>查看详情 <ArrowRight size={17} /></button>
+              </div>
+            </> : <>
+              <h2>下一场分享正在安排中</h2>
+              <p>可以先看看还没有人认领的议题。</p>
+              <div className="hero-actions"><button className="primary-button" onClick={() => showTopicView('OPEN')}>查看待认领议题 <ArrowRight size={17} /></button></div>
+            </>}
           </div>
-          <p className="tiny-note"><span /> 你可以添柴，也可以只是守着火光坐一会儿。</p>
+          <p className="hero-create-note">有想分享的话题？<button onClick={() => openAction('create')}>发起议题</button></p>
         </div>
         <FireVisual />
       </section>
 
       <section className="stats-wrap">
         <div className="stats shell">
-          <button className="stat-link" onClick={() => showTopicView('OPEN')}><span>等待认领</span><strong>{String(stats.open).padStart(2, '0')}</strong><small>簇等待接力的火种</small></button>
-          <button className="stat-link" onClick={() => showTopicView('CLAIMED')}><span>准备中</span><strong>{String(stats.claimed).padStart(2, '0')}</strong><small>位伙伴正在探索</small></button>
-          <button className="stat-link" onClick={() => showTopicView('SCHEDULED')}><span>已排期</span><strong>{String(stats.scheduled).padStart(2, '0')}</strong><small>场炉边分享</small></button>
-          <button className="stat-link" onClick={() => showTopicView('ARCHIVED')}><span>知识归档</span><strong>{String(stats.archived).padStart(2, '0')}</strong><small>份余温被保存</small></button>
-          <button className="next-fire stat-link" onClick={() => stats.nextTopic ? setActivityTopic(stats.nextTopic) : showTopicView('OPEN')}>
-            <span>NEXT FIRESIDE</span>
-            {stats.nextTopic ? <><strong>{stats.nextTopic.scheduledAt && formatDate(stats.nextTopic.scheduledAt)}</strong><small>{stats.nextTopic.title}</small></> : <><strong>等待排期</strong><small>认领一个议题，点燃下一炉</small></>}
-          </button>
+          <button className="stat-link" onClick={() => showTopicView('OPEN')}><span>等待认领</span><strong>{String(stats.open).padStart(2, '0')}</strong><small>个议题</small></button>
+          <button className="stat-link" onClick={() => showTopicView('CLAIMED')}><span>准备中</span><strong>{String(stats.claimed).padStart(2, '0')}</strong><small>个议题</small></button>
+          <button className="stat-link" onClick={() => showTopicView('SCHEDULED')}><span>已排期</span><strong>{String(stats.scheduled).padStart(2, '0')}</strong><small>场分享</small></button>
+          <button className="stat-link" onClick={() => showTopicView('ARCHIVED')}><span>分享记录</span><strong>{String(stats.archived).padStart(2, '0')}</strong><small>份记录</small></button>
         </div>
       </section>
 
       <section className="topics-section shell" id="topics">
-        <div className="section-heading">
-          <div><p className="section-kicker">TOPIC COMMONS · 议题广场</p><h2 tabIndex={-1}>炉边正在发生什么</h2></div>
-          <p>可以自己举起火炬，也可以邀请同伴接力。<br />从零散的兴趣，走向一次共同探索。</p>
+        <div className="section-heading topics-heading">
+          <div className="topics-heading-copy">
+            <h2 tabIndex={-1}>议题广场</h2>
+            <p>看看大家最近想聊什么，也可以报名或认领议题。</p>
+            <div className="result-context" aria-live="polite">
+              <span>{phaseFilter === 'ENDED' ? `待归档 · ${displayedTopics.length} 个议题` : `共 ${displayedTopics.length} 个议题`}</span>
+              {(phaseFilter || search) && <button onClick={() => { setPhaseFilter(null); setSearch(''); }}>清除条件</button>}
+            </div>
+          </div>
+          <div className="view-switch" aria-label="议题视图">
+            <button className={view === 'list' ? 'active' : ''} aria-pressed={view === 'list'} onClick={() => selectView('list')}>列表</button>
+            <button className={view === 'month' ? 'active' : ''} aria-pressed={view === 'month'} onClick={() => selectView('month')}>月历</button>
+            <button className={view === 'week' ? 'active' : ''} aria-pressed={view === 'week'} onClick={() => selectView('week')}>周历</button>
+          </div>
         </div>
         <div className="topic-toolbar">
           <div className="tabs">
-            {tabs.map((item) => <button key={item.key} className={tab === item.key && !phaseFilter ? 'active' : ''} aria-pressed={tab === item.key && !phaseFilter} onClick={() => selectTab(item.key)}>{item.label}</button>)}
+            {tabs.map((item) => <button key={item.key} className={tab === item.key && !phaseFilter ? 'active' : ''} aria-pressed={tab === item.key && !phaseFilter} onClick={() => selectTab(item.key)}>{item.label}<span>{tabCounts[item.key]}</span></button>)}
           </div>
-          <label className="search"><Search size={16} /><input value={search} onChange={(event) => { setActiveAnchor(null); setSearch(event.target.value); }} placeholder="搜索议题、标签或分享人" /></label>
-        </div>
-
-        <div className="view-sort-bar">
-          <div className="view-switch" aria-label="议题视图">
-            <button className={view === 'list' ? 'active' : ''} aria-pressed={view === 'list'} onClick={() => selectView('list')}><List size={15} />列表</button>
-            <button className={view === 'month' ? 'active' : ''} aria-pressed={view === 'month'} onClick={() => selectView('month')}><Calendar size={15} />月历</button>
-            <button className={view === 'week' ? 'active' : ''} aria-pressed={view === 'week'} onClick={() => selectView('week')}><CalendarRange size={15} />周历</button>
-          </div>
+          <div className="toolbar-tools">
+            <label className="search"><Search size={16} /><input value={search} onChange={(event) => { setActiveAnchor(null); setSearch(event.target.value); }} placeholder="搜索议题" aria-label="搜索议题、标签或分享人" /></label>
           <div className="sort-control">
-            {view === 'list' && <label>排序方式
+            {view === 'list' && <label><span className="sr-only">排序方式</span>
               <select value={sort} disabled={reordering} onChange={(event) => changeSort(event.target.value as TopicSort)}>
                 <option value="manual">手动排序</option>
                 <option value="newest">最新创建</option>
@@ -1970,17 +1992,13 @@ export default function App() {
                 <option value="status">议题状态</option>
               </select>
             </label>}
-            {view === 'list' && sort === 'manual' && !canManualReorder && <span className="sort-hint">{!canCollaborate ? '解锁协作后可调整顺序' : loading || loadedSort !== 'manual' ? '正在加载可排序快照…' : '清除搜索并切回“全部议题”后可手动排序'}</span>}
             {reordering && <span className="sort-saving">正在保存顺序…</span>}
+            {view === 'list' && canManualReorder && <button className={`order-mode-button ${orderMode ? 'active' : ''}`} disabled={reordering} onClick={() => setOrderMode((current) => !current)}><GripVertical size={14} />{orderMode ? '完成排序' : '调整顺序'}</button>}
+          </div>
           </div>
         </div>
 
-        <div className="result-context" aria-live="polite">
-          <span>{phaseFilter === 'ENDED' ? '待归档任务' : tabs.find((item) => item.key === tab)?.label} · {displayedTopics.length} 个结果</span>
-          {(phaseFilter || search) && <button onClick={() => { setPhaseFilter(null); setSearch(''); }}>清除条件</button>}
-        </div>
-
-        {loading ? <div className="empty-state"><Flame className="loading-flame" /><h3>正在点燃炉火…</h3></div>
+        {loading ? <div className="empty-state"><Flame className="loading-flame" /><h3>正在加载议题…</h3></div>
           : loadError ? <div className="empty-state"><h3>{loadError}</h3><button onClick={() => void load()}>重新连接</button></div>
           : displayedTopics.length && view === 'list' ? <div className="topic-grid">{displayedTopics.map((topic, index) => <TopicCard
               key={topic.id}
@@ -1993,50 +2011,50 @@ export default function App() {
               onPoster={setPosterTopic}
               onMeeting={openMeeting}
               canCollaborate={canCollaborate}
-              draggable={canManualReorder}
+              draggable={orderMode && canManualReorder}
               reordering={reordering}
               onDragStart={(id) => { if (!reorderInFlight.current) setDraggedId(id); }}
               onDrop={dropTopic}
               onMove={moveTopic}
             />)}</div>
           : view !== 'list' ? <CalendarView topics={displayedTopics} mode={view} cursor={calendarCursor} onCursorChange={setCalendarCursor} onOpen={setActivityTopic} onParticipants={openParticipants} onMeeting={openMeeting} onPoster={setPosterTopic} onShowOpenTopics={() => showTopicView('OPEN')} now={now} />
-          : search ? <div className="empty-state"><Search /><h3>没有找到匹配的议题</h3><p>可以清除搜索，再看看所有火种。</p><button onClick={() => setSearch('')}>清除搜索</button></div>
+          : search ? <div className="empty-state"><Search /><h3>没有找到匹配的议题</h3><p>清除搜索后可以查看全部议题。</p><button onClick={() => setSearch('')}>清除搜索</button></div>
           : phaseFilter === 'ENDED' ? <div className="empty-state"><Archive /><h3>当前没有待归档活动</h3><p>已经结束的活动会出现在这里。</p><button onClick={() => showTopicView('SCHEDULED')}>查看已排期</button></div>
-          : topics.length > 0 ? <div className="empty-state"><Lightbulb /><h3>当前筛选没有议题</h3><p>换个状态，看看广场里的其他火种。</p><button onClick={() => showTopicView('ALL')}>查看全部议题</button></div>
-          : <div className="empty-state"><Lightbulb /><h3>这里还没有火种</h3><p>成为第一个发起议题的人。</p><button onClick={() => openAction('create')}>发起议题</button></div>}
+          : topics.length > 0 ? <div className="empty-state"><Lightbulb /><h3>当前筛选没有议题</h3><p>换个状态查看其他议题。</p><button onClick={() => showTopicView('ALL')}>查看全部议题</button></div>
+          : <div className="empty-state"><Lightbulb /><h3>这里还没有议题</h3><p>你可以发起第一个议题。</p><button onClick={() => openAction('create')}>发起议题</button></div>}
         <p className="sr-only" aria-live="polite">{liveMessage}</p>
       </section>
 
       <section className="how-wrap" id="how">
         <div className="shell">
-          <div className="section-heading compact"><div><p className="section-kicker">HOW IT WORKS · 如何围炉</p><h2 tabIndex={-1}>从一点好奇，到一束火光</h2></div><p>没有复杂流程，也没有专家门槛。</p></div>
+          <div className="section-heading compact"><div><h2 tabIndex={-1}>如何参与</h2></div><p>从提出议题到完成分享，<br />一共五个步骤。</p></div>
           <div className="flow-grid">
-            <button onClick={() => openAction('create')}><span>01</span><i><Lightbulb /></i><h3>创建议题</h3><p>留下一个真问题，告诉大家它为什么让你好奇。</p></button>
-            <button onClick={() => showTopicView('OPEN')}><span>02</span><i><UserRoundPlus /></i><h3>认领议题</h3><p>愿意多走一步的人接过火炬，开始做些探索。</p></button>
-            <button onClick={() => showTopicView('CLAIMED')}><span>03</span><i><CalendarDays /></i><h3>议题排期</h3><p>约定时间与地点，为共同讨论留出一个晚上。</p></button>
-            <button onClick={() => showTopicView('SCHEDULED', 'week')}><span>04</span><i><Users /></i><h3>报名围炉</h3><p>查看本周排期，报名旁听或进入线上会议。</p></button>
-            <button onClick={() => showTopicView('SCHEDULED', 'list', '', 'ENDED')}><span>05</span><i><Archive /></i><h3>沉淀归档</h3><p>找到已结束的活动，记下收获与线索。</p></button>
+            <button onClick={() => openAction('create')}><span>01</span><i><Lightbulb /></i><h3>提出议题</h3><p>写下你想讨论的问题，以及希望了解什么。</p></button>
+            <button onClick={() => showTopicView('OPEN')}><span>02</span><i><UserRoundPlus /></i><h3>认领准备</h3><p>选择一个议题，做一些资料收集和准备。</p></button>
+            <button onClick={() => showTopicView('CLAIMED')}><span>03</span><i><CalendarDays /></i><h3>确定时间</h3><p>与发起人确认分享时间、地点和时长。</p></button>
+            <button onClick={() => showTopicView('SCHEDULED', 'week')}><span>04</span><i><Users /></i><h3>报名参加</h3><p>查看近期安排，报名参加感兴趣的分享。</p></button>
+            <button onClick={() => showTopicView('SCHEDULED', 'list', '', 'ENDED')}><span>05</span><i><Archive /></i><h3>整理记录</h3><p>分享结束后，记录结论、资料和后续问题。</p></button>
           </div>
         </div>
       </section>
 
       <section className="manifesto shell">
         <div>
-          <p className="section-kicker">THE TONE · 我们的基调</p>
-          <h2>知识不会因为被收藏而发光，<br />它要被看见、被追问、<br /><span>被讲给另一个人听。</span></h2>
+          <p className="section-kicker">PARTICIPATION · 参与原则</p>
+          <h2>分享不要求完美，<br /><span>带着问题来也可以。</span></h2>
         </div>
         <div className="principles">
-          <article><strong>不是任务</strong><p>完全自愿。可以分享，也可以只听。</p></article>
-          <article><strong>不是考试</strong><p>可以带着半成品和没想明白的东西来。</p></article>
-          <article><strong>不等专家</strong><p>认领的人，只需要比昨晚多查一点。</p></article>
+          <article><strong>自愿参加</strong><p>可以分享，也可以只听。</p></article>
+          <article><strong>不用准备完整答案</strong><p>半成品、实践过程和没想明白的问题都可以讨论。</p></article>
+          <article><strong>不要求是专家</strong><p>提前做一些准备，愿意把过程讲清楚就够了。</p></article>
         </div>
       </section>
 
       <section className="closing shell">
         <div className="closing-glow" />
-        <p className="section-kicker">KEEP THE FIRE BURNING</p>
-        <h2>今晚，你想为哪一份好奇<br /><span>添一把柴？</span></h2>
-        <p>一个问题不必宏大，一次分享也不必完美。<br />只要有人愿意把注意力投向未知，炉火就不会熄灭。</p>
+        <p className="section-kicker">SHARE WITH THE TEAM</p>
+        <h2>有想讨论或分享的<br /><span>话题吗？</span></h2>
+        <p>写下你的问题，或者认领一个已有议题。<br />不需要完整答案，先开始准备就可以。</p>
         <div className="closing-actions">
           <button className="primary-button large" onClick={() => openAction('create')}><Flame size={20} /> 发起我的议题</button>
           <button className="ghost-button large" onClick={() => showTopicView('OPEN')}><UserRoundPlus size={19} /> 认领一个议题</button>
